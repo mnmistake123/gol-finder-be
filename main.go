@@ -16,6 +16,10 @@ import (
 func main() {
 	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
 
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Server is running")
+	})
+
 	http.HandleFunc("/payment-sheet", handlePaymentSheet)
 
 	port := os.Getenv("PORT")
