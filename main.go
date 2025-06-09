@@ -50,8 +50,8 @@ func handlePaymentSheet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	piparams := &stripe.PaymentIntentParams{
-		Amount:   stripe.Int64(1099),
-		Currency: stripe.String(string(stripe.CurrencyEUR)),
+		Amount:   stripe.Int64(103),
+		Currency: stripe.String(string(stripe.CurrencyUSD)),
 		Customer: stripe.String(c.ID),
 		AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
 			Enabled: stripe.Bool(true),
