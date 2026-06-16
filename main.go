@@ -56,6 +56,8 @@ func handlePaymentSheet(w http.ResponseWriter, r *http.Request) {
 		Email: stripe.String(body.Email),
 		Name:  stripe.String(body.Name),
 		Metadata: map[string]string{
+			"name": body.Email,
+			"email": body.Name,
 			"matchDate": body.MatchDate,
 			"location": body.Location,
 		},
@@ -126,18 +128,18 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if event.Type == "payment_intent.succeeded" {
-		var session stripe.CheckoutSession
-		err := json.Unmarshal(event.Data.Raw, &session)
-		if err != nil {
-			http.Error(w, "Unmarshal error", http.StatusBadRequest)
+		var paymentIntent stripe.PaymentIntent
+		if err := json.Unmarshal(event.Data.Raw, &paymentIntent); err != nil {
+			http.Error(w, "Error parsing payment intent", http.StatusBadRequest)
 			return
-		}	
+		}
+	
+		customerEmail := paymentIntent.Metadata["email"]
+		customerName := paymentIntent.Metadata["name"]
+		matchDate := paymentIntent.Metadata["matchDate"]
+		matchLocation := paymentIntent.Metadata["location"]
 
-		customerEmail := session.CustomerDetails.Email
-		matchDate := session.Metadata["matchDate"]
-		matchLocation := session.Metadata["location"]
-
-		err = sendConfirmationEmail(customerEmail, matchDate, matchLocation)
+		err = sendConfirmationEmail(customerName, customerEmail, matchDate, matchLocation)
 		if err != nil {
 			fmt.Println("Error sending email:", err)
 			http.Error(w, "Email error", http.StatusInternalServerError)
@@ -149,21 +151,22 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 
-func sendConfirmationEmail(to string, date string, location string) error {
+func sendConfirmationEmail(name string, to string, date string, location string) error {
 	apiKey := os.Getenv("RESEND_API_KEY")
 	client := resend.NewClient(apiKey)
 
 	params := &resend.SendEmailRequest{
 		From:    "Acme <onboarding@resend.dev>",
-		To:      []string{"rhrh1723@jfikepe.resend.app"},
+		To:      []string{to},
 		Subject: "🎉 Tu partido ha sido confirmado",
 		Html: fmt.Sprintf(`
+			<h2>¡Hola %s!</h2>
 			<h2>¡Gracias por tu pago!</h2>
 			<p>Tu partido en <strong>GolFinder</strong> ha sido confirmado.</p>
 			<p><b>Fecha:</b> %s<br/>
 			<b>Lugar:</b> %s</p>
 			<p>¡Nos vemos en la cancha! ⚽</p>
-		`, date, location),
+		`, name, date, location),
 	}
 
 	email, err := client.Emails.Send(params)
