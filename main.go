@@ -63,6 +63,9 @@ func handlePaymentSheet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Print body right after decoding
+	log.Printf("Body received: %+v", body)
+
 	ekparams := &stripe.EphemeralKeyParams{
 		Customer:      stripe.String(c.ID),
 		StripeVersion: stripe.String("2023-08-16"),
@@ -82,8 +85,8 @@ func handlePaymentSheet(w http.ResponseWriter, r *http.Request) {
 			Enabled: stripe.Bool(true),
 		},
 		Metadata: map[string]string{
-			"name": body.Email,
-			"email": body.Name,
+			"email": body.Email,
+			"name": body.Name,
 			"matchDate": body.MatchDate,
 			"location": body.Location,
 		},
