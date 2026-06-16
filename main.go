@@ -134,6 +134,12 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	
+		// Print raw JSON
+		log.Printf("Raw event data: %s", string(event.Data.Raw))
+
+		// Print full paymentIntent struct
+		log.Printf("PaymentIntent: %+v", paymentIntent)
+
 		customerEmail := paymentIntent.Metadata["email"]
 		customerName := paymentIntent.Metadata["name"]
 		matchDate := paymentIntent.Metadata["matchDate"]
