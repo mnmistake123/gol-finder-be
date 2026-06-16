@@ -13,7 +13,7 @@ import (
 	"github.com/stripe/stripe-go/v75/paymentintent"
 	"github.com/stripe/stripe-go/v75/webhook"
 
-	resend "github.com/resend/resend-go/v2"
+	resend "github.com/resend/resend-go/v3"
 )
 
 func main() {
@@ -133,8 +133,8 @@ func sendConfirmationEmail(to string, date string, location string) error {
 	client := resend.NewClient(apiKey)
 
 	params := &resend.SendEmailRequest{
-		From:    "onboarding@resend.dev",
-		To:      []string{to},
+		From:    "Acme <onboarding@resend.dev>",
+		To:      []string{"delivered@resend.dev"},
 		Subject: "🎉 Tu partido ha sido confirmado",
 		Html: fmt.Sprintf(`
 			<h2>¡Gracias por tu pago!</h2>
