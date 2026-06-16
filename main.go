@@ -134,7 +134,7 @@ func sendConfirmationEmail(to string, date string, location string) error {
 
 	params := &resend.SendEmailRequest{
 		From:    "Acme <onboarding@resend.dev>",
-		To:      []string{"delivered@resend.dev"},
+		To:      []string{"rhrh1723@jfikepe.resend.app"},
 		Subject: "🎉 Tu partido ha sido confirmado",
 		Html: fmt.Sprintf(`
 			<h2>¡Gracias por tu pago!</h2>
