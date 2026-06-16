@@ -40,7 +40,27 @@ func handlePaymentSheet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cparams := &stripe.CustomerParams{}
+	var body struct {
+		Email     string  `json:"email"`
+		Name      string  `json:"name"`
+		MatchDate string  `json:"matchDate"`
+		Location  string  `json:"location"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	cparams := &stripe.CustomerParams{
+		Email: stripe.String(body.Email),
+		Name:  stripe.String(body.Name),
+		Metadata: map[string]string{
+			"matchDate": body.MatchDate,
+			"location": body.Location,
+		},
+	}
+
 	c, err := customer.New(cparams)
 	if err != nil {
 		http.Error(w, "Failed to create customer", http.StatusInternalServerError)
@@ -51,6 +71,7 @@ func handlePaymentSheet(w http.ResponseWriter, r *http.Request) {
 		Customer:      stripe.String(c.ID),
 		StripeVersion: stripe.String("2023-08-16"),
 	}
+
 	ek, err := ephemeralkey.New(ekparams)
 	if err != nil {
 		http.Error(w, "Failed to create ephemeral key", http.StatusInternalServerError)
