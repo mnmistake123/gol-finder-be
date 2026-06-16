@@ -99,6 +99,7 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 
 	event, err := webhook.ConstructEvent(payload, r.Header.Get("Stripe-Signature"), os.Getenv("STRIPE_WEBHOOK_SECRET"))
 	if err != nil {
+		log.Printf("Webhook error: %v", err)
 		http.Error(w, "Signature error", http.StatusBadRequest)
 		return
 	}
