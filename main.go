@@ -55,12 +55,6 @@ func handlePaymentSheet(w http.ResponseWriter, r *http.Request) {
 	cparams := &stripe.CustomerParams{
 		Email: stripe.String(body.Email),
 		Name:  stripe.String(body.Name),
-		Metadata: map[string]string{
-			"name": body.Email,
-			"email": body.Name,
-			"matchDate": body.MatchDate,
-			"location": body.Location,
-		},
 	}
 
 	c, err := customer.New(cparams)
@@ -86,6 +80,12 @@ func handlePaymentSheet(w http.ResponseWriter, r *http.Request) {
 		Customer: stripe.String(c.ID),
 		AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
 			Enabled: stripe.Bool(true),
+		},
+		Metadata: map[string]string{
+			"name": body.Email,
+			"email": body.Name,
+			"matchDate": body.MatchDate,
+			"location": body.Location,
 		},
 	}
 	
