@@ -104,13 +104,13 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if event.Type == "checkout.session.completed" {
+	if event.Type == "payment_intent.succeeded" {
 		var session stripe.CheckoutSession
 		err := json.Unmarshal(event.Data.Raw, &session)
 		if err != nil {
 			http.Error(w, "Unmarshal error", http.StatusBadRequest)
 			return
-		}
+		}	
 
 		customerEmail := session.CustomerDetails.Email
 		matchDate := session.Metadata["matchDate"]
