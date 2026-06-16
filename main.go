@@ -1,14 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"io/ioutil"
 	"net/http"
 	"os"
-
 	"github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/customer"
 	"github.com/stripe/stripe-go/v76/ephemeralkey"
@@ -130,29 +128,27 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 
 
 func sendConfirmationEmail(to string, date string, location string) error {
-	apiKey := os.Getenv("RESEND_API_KEY") // store this securely, e.g., in .env or secrets manager
-
+	apiKey := os.Getenv("RESEND_API_KEY")
 	client := resend.NewClient(apiKey)
 
 	params := &resend.SendEmailRequest{
-		From:    "GolFinder <noreply@golfinder.com>", // must be a verified domain or sender in Resend
-		To:      []string{"customer@example.com"},
+		From:    "onboarding@resend.dev",
+		To:      []string{to},
 		Subject: "🎉 Tu partido ha sido confirmado",
-		Html: `
+		Html: fmt.Sprintf(`
 			<h2>¡Gracias por tu pago!</h2>
 			<p>Tu partido en <strong>GolFinder</strong> ha sido confirmado.</p>
-			<p><b>Fecha:</b> 10 de julio, 18:00 hrs<br/>
-			<b>Lugar:</b> Parque La Carolina, Quito</p>
+			<p><b>Fecha:</b> %s<br/>
+			<b>Lugar:</b> %s</p>
 			<p>¡Nos vemos en la cancha! ⚽</p>
-		`,
+		`, date, location),
 	}
 
-	// You can also use Text: "text-only fallback" if needed
-
-	email, err := client.Emails.Send(context.Background(), params)
+	email, err := client.Emails.Send(params)
 	if err != nil {
-		log.Fatalf("Error sending email: %v", err)
+		return err
 	}
 
 	fmt.Println("Email sent! ID:", email.Id)
+	return nil
 }
