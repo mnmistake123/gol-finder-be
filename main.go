@@ -18,6 +18,7 @@ import (
 	resend "github.com/resend/resend-go/v3"
 	"cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go/v4"
+	 "google.golang.org/api/option"
 )
 
 var firestoreClient *firestore.Client
@@ -189,14 +190,18 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func initFirestore(ctx context.Context) (*firestore.Client, error) {
-	conf := &firebase.Config{
-		ProjectID: os.Getenv("FIREBASE_PROJECT_ID"),
-	}
-	app, err := firebase.NewApp(ctx, conf)
-	if err != nil {
-		return nil, err
-	}
-	return app.Firestore(ctx)
+    credsJSON := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+    sa := option.WithCredentialsJSON([]byte(credsJSON))
+
+    conf := &firebase.Config{
+        ProjectID: os.Getenv("FIREBASE_PROJECT_ID"),
+    }
+
+    app, err := firebase.NewApp(ctx, conf, sa)
+    if err != nil {
+        return nil, err
+    }
+    return app.Firestore(ctx)
 }
 
 func saveOrderToFirestore(ctx context.Context, userId string, matchId string, amount int64, timestamp time.Time, paymentIntentID string) error {
