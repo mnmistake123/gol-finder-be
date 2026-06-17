@@ -203,6 +203,8 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("Body received: %+v", body)
+
 	ctx := context.Background()
 
 	pi, err := paymentintent.Get(body.IntentId, nil)
