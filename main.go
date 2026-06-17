@@ -18,7 +18,9 @@ import (
 	resend "github.com/resend/resend-go/v3"
 	"cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go/v4"
-	 "google.golang.org/api/option"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var firestoreClient *firestore.Client
@@ -41,6 +43,7 @@ func main() {
 
 	http.HandleFunc("/payment-sheet", handlePaymentSheet)
 	http.HandleFunc("/comfirmation-web-hook", handleStripeWebhook)
+	http.HandleFunc("/remove-from-match", handleRemoveFromMatch)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -153,12 +156,6 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Error parsing payment intent", http.StatusBadRequest)
 			return
 		}
-	
-		// Print raw JSON
-		log.Printf("Raw event data: %s", string(event.Data.Raw))
-
-		// Print full paymentIntent struct
-		log.Printf("PaymentIntent: %+v", paymentIntent)
 
 		customerEmail := paymentIntent.Metadata["email"]
 		userId := paymentIntent.Metadata["userId"]
@@ -187,6 +184,86 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var body struct {
+		MatchId   string `json:"matchId"`
+		UserId    string `json:"userId"`
+		IntentId  string `json:"intentId"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	ctx := context.Background()
+
+	pi, err := paymentintent.Get(body.IntentId, nil)
+	if err != nil {
+		http.Error(w, "Payment intent not found", http.StatusNotFound)
+		return
+	}
+
+	if pi.Status != stripe.PaymentIntentStatusSucceeded {
+		http.Error(w, "Payment was not successful", http.StatusBadRequest)
+		return
+	}
+
+	paymentRecordRef := firestoreClient.Collection("paymentRecords").Doc(body.IntentId)
+	paymentRecordDoc, err := paymentRecordRef.Get(ctx)
+	if err != nil {
+		http.Error(w, "Payment record not found", http.StatusNotFound)
+		return
+	}
+
+	paymentData := paymentRecordDoc.Data()
+	if paymentData["userId"] != body.UserId || paymentData["matchId"] != body.MatchId || paymentData["paymentIntentID"] != body.IntentId {
+		http.Error(w, "Payment record does not match provided credentials", http.StatusBadRequest)
+		return
+	}
+
+	err = firestoreClient.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		if err := tx.Update(paymentRecordRef, []firestore.Update{
+			{Path: "isCancelled", Value: true},
+		}); err != nil {
+			return err
+		}
+
+		balanceRef := firestoreClient.Collection("UserBalance").Doc(body.UserId)
+		balanceDoc, err := tx.Get(balanceRef)
+		if err != nil && status.Code(err) != codes.NotFound {
+			return err
+		}
+
+		var currentBalance int64 = 0
+		if err == nil {
+			currentBalance = balanceDoc.Data()["balance"].(int64)
+		}
+
+		newBalance := currentBalance + pi.Amount
+		return tx.Set(balanceRef, map[string]interface{}{
+			"userId":  body.UserId,
+			"balance": newBalance,
+		}, firestore.MergeAll)
+	})
+	if err != nil {
+		fmt.Println("Error in transaction:", err)
+		http.Error(w, "Failed to process cancellation", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Successfully removed from match",
+		"balance": fmt.Sprintf("%d", pi.Amount),
+	})
 }
 
 func initFirestore(ctx context.Context) (*firestore.Client, error) {
