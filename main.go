@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"time"
 	"github.com/stripe/stripe-go/v75"
 	"github.com/stripe/stripe-go/v75/customer"
 	"github.com/stripe/stripe-go/v75/ephemeralkey"
@@ -14,9 +16,22 @@ import (
 	"github.com/stripe/stripe-go/v75/webhook"
 
 	resend "github.com/resend/resend-go/v3"
+	"cloud.google.com/go/firestore"
+	firebase "firebase.google.com/go/v4"
 )
 
+var firestoreClient *firestore.Client
+
 func main() {
+	ctx := context.Background()
+
+	var err error
+	firestoreClient, err = initFirestore(ctx)
+	if err != nil {
+		log.Fatalf("Failed to initialize Firestore: %v", err)
+	}
+	defer firestoreClient.Close()
+
 	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +57,8 @@ func handlePaymentSheet(w http.ResponseWriter, r *http.Request) {
 
 	var body struct {
 		Email     string  `json:"email"`
+		UserId    string  `json:"userId"`
+		MatchId    string `json:"matchId"`
 		Name      string  `json:"name"`
 		MatchDate string  `json:"matchDate"`
 		Location  string  `json:"location"`
@@ -63,9 +80,6 @@ func handlePaymentSheet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Print body right after decoding
-	log.Printf("Body received: %+v", body)
-
 	ekparams := &stripe.EphemeralKeyParams{
 		Customer:      stripe.String(c.ID),
 		StripeVersion: stripe.String("2023-08-16"),
@@ -86,6 +100,8 @@ func handlePaymentSheet(w http.ResponseWriter, r *http.Request) {
 		},
 		Metadata: map[string]string{
 			"email": body.Email,
+			"userId": body.UserId,
+			"matchId": body.MatchId,
 			"name": body.Name,
 			"matchDate": body.MatchDate,
 			"location": body.Location,
@@ -144,9 +160,22 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		log.Printf("PaymentIntent: %+v", paymentIntent)
 
 		customerEmail := paymentIntent.Metadata["email"]
+		userId := paymentIntent.Metadata["userId"]
+		matchId := paymentIntent.Metadata["matchId"]
 		customerName := paymentIntent.Metadata["name"]
 		matchDate := paymentIntent.Metadata["matchDate"]
 		matchLocation := paymentIntent.Metadata["location"]
+
+		timestamp := time.Unix(paymentIntent.Created, 0)
+
+		ctx := context.Background()
+	
+		err = saveOrderToFirestore(ctx, userId, matchId, paymentIntent.Amount, timestamp, paymentIntent.ID)
+		if err != nil {
+			fmt.Println("Error saving order to Firestore:", err)
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
 
 		err = sendConfirmationEmail(customerName, customerEmail, matchDate, matchLocation)
 		if err != nil {
@@ -159,6 +188,30 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func initFirestore(ctx context.Context) (*firestore.Client, error) {
+	conf := &firebase.Config{
+		ProjectID: os.Getenv("FIREBASE_PROJECT_ID"),
+	}
+	app, err := firebase.NewApp(ctx, conf)
+	if err != nil {
+		return nil, err
+	}
+	return app.Firestore(ctx)
+}
+
+func saveOrderToFirestore(ctx context.Context, userId string, matchId string, amount int64, timestamp time.Time, paymentIntentID string) error {
+	order := map[string]interface{}{
+		"userId":            userId,
+		"matchId":           matchId,
+		"amount":            amount,
+		"timestamp":         timestamp,
+		"paymentIntentID":   paymentIntentID,
+		"isComfirmed":       true,
+	}
+
+	_, err := firestoreClient.Collection("paymentRecords").Doc(paymentIntentID).Set(ctx, order)
+	return err
+}
 
 func sendConfirmationEmail(name string, to string, date string, location string) error {
 	apiKey := os.Getenv("RESEND_API_KEY")
