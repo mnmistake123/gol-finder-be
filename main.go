@@ -289,6 +289,7 @@ func saveOrderToFirestore(ctx context.Context, userId string, matchId string, am
 		"timestamp":         timestamp,
 		"paymentIntentID":   paymentIntentID,
 		"isComfirmed":       true,
+		"isCanceled":        false,
 	}
 
 	_, err := firestoreClient.Collection("paymentRecords").Doc(paymentIntentID).Set(ctx, order)
