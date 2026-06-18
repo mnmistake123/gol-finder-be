@@ -257,6 +257,11 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	customerEmail := pi.Metadata["email"]
+	customerName := pi.Metadata["name"]
+	matchDate := pi.Metadata["matchDate"]
+	matchLocation := pi.Metadata["location"]
+
 	err = firestoreClient.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		balanceRef := firestoreClient.Collection("UserBalance").Doc(body.UserId)
 		balanceDoc, err := tx.Get(balanceRef)
@@ -277,10 +282,18 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		return tx.Set(balanceRef, map[string]interface{}{
+		if err := tx.Set(balanceRef, map[string]interface{}{
 			"userId":  body.UserId,
 			"balance": newBalance,
-		}, firestore.MergeAll)
+		}, firestore.MergeAll); err != nil {
+			return err
+		}
+
+		if err := sendCancellationEmail(customerName, customerEmail, matchDate, matchLocation); err != nil {
+			return err
+		}
+
+		return nil
 	})
 	if err != nil {
 		fmt.Println("Error in transaction:", err)
@@ -349,5 +362,33 @@ func sendConfirmationEmail(name string, to string, date string, location string)
 	}
 
 	fmt.Println("Email sent! ID:", email.Id)
+	return nil
+}
+
+func sendCancellationEmail(name string, to string, date string, location string) error {
+	apiKey := os.Getenv("RESEND_API_KEY")
+	client := resend.NewClient(apiKey)
+
+	params := &resend.SendEmailRequest{
+		From:    "Acme <onboarding@resend.dev>",
+		To:      []string{to},
+		Subject: "❌ Tu cancelación ha sido procesada",
+		Html: fmt.Sprintf(`
+			<h2>¡Hola %s!</h2>
+			<h2>Tu cancelación ha sido procesada</h2>
+			<p>Hemos cancelado tu participación en el partido de <strong>GolFinder</strong>.</p>
+			<p><b>Fecha:</b> %s<br/>
+			<b>Lugar:</b> %s</p>
+			<p>Te hemos reembolsado el monto correspondiente a tu saldo.</p>
+			<p>¡Esperamos verte en un próximo partido! ⚽</p>
+		`, name, date, location),
+	}
+
+	email, err := client.Emails.Send(params)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Cancellation email sent! ID:", email.Id)
 	return nil
 }
