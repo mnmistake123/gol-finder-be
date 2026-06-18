@@ -203,8 +203,6 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Body received: %+v", body)
-
 	ctx := context.Background()
 
 	pi, err := paymentintent.Get(body.IntentId, nil)
@@ -274,6 +272,7 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 		balanceRef := firestoreClient.Collection("UserBalance").Doc(body.UserId)
 		balanceDoc, err := tx.Get(balanceRef)
 		if err != nil && status.Code(err) != codes.NotFound {
+			fmt.Println("Error getting user balance besides not finding it", err)
 			return err
 		}
 
@@ -287,6 +286,7 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 		if err := tx.Update(paymentRecordRef, []firestore.Update{
 			{Path: "isCanceled", Value: true},
 		}); err != nil {
+			fmt.Println("Can't update is Canceled field", err)
 			return err
 		}
 
@@ -294,10 +294,12 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 			"userId":  body.UserId,
 			"balance": newBalance,
 		}, firestore.MergeAll); err != nil {
+			fmt.Println("Can't create UserBalance record", err)
 			return err
 		}
 
 		if err := sendCancellationEmail(customerName, customerEmail, matchDate, matchLocation); err != nil {
+			fmt.Println("Can't send Cancellation Email", err)
 			return err
 		}
 
