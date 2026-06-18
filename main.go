@@ -232,12 +232,6 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = firestoreClient.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
-		if err := tx.Update(paymentRecordRef, []firestore.Update{
-			{Path: "isCancelled", Value: true},
-		}); err != nil {
-			return err
-		}
-
 		balanceRef := firestoreClient.Collection("UserBalance").Doc(body.UserId)
 		balanceDoc, err := tx.Get(balanceRef)
 		if err != nil && status.Code(err) != codes.NotFound {
@@ -250,6 +244,13 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 		}
 
 		newBalance := currentBalance + pi.Amount
+
+		if err := tx.Update(paymentRecordRef, []firestore.Update{
+			{Path: "isCancelled", Value: true},
+		}); err != nil {
+			return err
+		}
+
 		return tx.Set(balanceRef, map[string]interface{}{
 			"userId":  body.UserId,
 			"balance": newBalance,
