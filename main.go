@@ -246,7 +246,7 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 		newBalance := currentBalance + pi.Amount
 
 		if err := tx.Update(paymentRecordRef, []firestore.Update{
-			{Path: "isCancelled", Value: true},
+			{Path: "isCanceled", Value: true},
 		}); err != nil {
 			return err
 		}
