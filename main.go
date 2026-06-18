@@ -239,17 +239,9 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	matchData := groundDoc.Data()
-	gameTimestampStr, ok := matchData["GameTimestamp"].(string)
+	gameTimestamp, ok := matchData["GameTimestamp"].(time.Time)
 	if !ok {
-		log.Printf("Invalid match data GameTimestamp %+v", matchData)
-		http.Error(w, "Invalid match data", http.StatusInternalServerError)
-		return
-	}
-
-	gameTimestamp, err := time.Parse("January 2, 2006 at 3:04:05 PM MST", gameTimestampStr)
-	if err != nil {
-		log.Printf("nvalid game timestamp format gameTimestampStr %+v", gameTimestampStr)
-		http.Error(w, "Invalid game timestamp format", http.StatusInternalServerError)
+		http.Error(w, "Invalid match data timestamp", http.StatusInternalServerError)
 		return
 	}
 
