@@ -262,6 +262,11 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 	matchDate := pi.Metadata["matchDate"]
 	matchLocation := pi.Metadata["location"]
 
+	if customerEmail == "" {
+		http.Error(w, "Email not found in payment intent", http.StatusBadRequest)
+		return
+	}
+
 	err = firestoreClient.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		balanceRef := firestoreClient.Collection("UserBalance").Doc(body.UserId)
 		balanceDoc, err := tx.Get(balanceRef)
