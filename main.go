@@ -250,7 +250,13 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 	oneDayBefore := gameTimestamp.Add(-24 * time.Hour)
 	if now.After(oneDayBefore) {
 		log.Printf("24 hours thing %v", oneDayBefore)
-		http.Error(w, "Cancellation must be done at least 24 hours before the game", http.StatusBadRequest)
+		
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Cancellation must be done at least 24 hours before the game",
+		})
 		return
 	}
 
