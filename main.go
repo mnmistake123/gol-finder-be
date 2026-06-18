@@ -231,6 +231,32 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	groundDoc, err := firestoreClient.Collection("Grounds").Doc(body.MatchId).Get(ctx)
+	if err != nil {
+		http.Error(w, "Match not found", http.StatusNotFound)
+		return
+	}
+
+	matchData := groundDoc.Data()
+	gameTimestampStr, ok := matchData["GameTimestamp"].(string)
+	if !ok {
+		http.Error(w, "Invalid match data", http.StatusInternalServerError)
+		return
+	}
+
+	gameTimestamp, err := time.Parse("January 2, 2006 at 3:04:05 PM MST", gameTimestampStr)
+	if err != nil {
+		http.Error(w, "Invalid game timestamp format", http.StatusInternalServerError)
+		return
+	}
+
+	now := time.Now()
+	oneDayBefore := gameTimestamp.Add(-24 * time.Hour)
+	if now.After(oneDayBefore) {
+		http.Error(w, "Cancellation must be done at least 24 hours before the game", http.StatusBadRequest)
+		return
+	}
+
 	err = firestoreClient.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
 		balanceRef := firestoreClient.Collection("UserBalance").Doc(body.UserId)
 		balanceDoc, err := tx.Get(balanceRef)
