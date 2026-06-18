@@ -311,6 +311,7 @@ func handleRemoveFromMatch(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
+		"success": true,
 		"message": "Successfully removed from match",
 		"balance": fmt.Sprintf("%d", pi.Amount),
 	})
